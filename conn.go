@@ -340,21 +340,26 @@ func (c *UTPConn) loop() {
 	for {
 		select {
 		case p := <-c.recvch:
+			ulog.Printf(5, "Conn(%v): <-c.recvch:", c.LocalAddr())
 			if p != nil {
 				c.processPacket(*p)
 				lastReceived = time.Now()
 			} else {
 				recvExit = true
 			}
+			ulog.Printf(5, "Conn(%v): ~<-c.recvch:", c.LocalAddr())
 
 		case b := <-c.sendch:
+			ulog.Printf(5, "Conn(%v): <-c.sendch:", c.LocalAddr())
 			if b != nil {
 				c.sendPacket(*b)
 			} else {
 				sendExit = true
 			}
+			ulog.Printf(5, "Conn(%v): ~<-c.sendch:", c.LocalAddr())
 
 		case <-time.After(time.Duration(c.rto) * time.Millisecond):
+			ulog.Printf(5, "Conn(%v): <-time.After:", c.LocalAddr())
 			state := c.getState()
 			if !state.active && time.Now().Sub(lastReceived) > reset_timeout {
 				ulog.Printf(2, "Conn(%v): Connection timed out", c.LocalAddr())
@@ -370,6 +375,7 @@ func (c *UTPConn) loop() {
 					c.resendPacket(p)
 				}
 			}
+			ulog.Printf(5, "Conn(%v): ~<-time.After:", c.LocalAddr())
 		case d := <-c.keepalivech:
 			if d <= 0 {
 				keepalive = nil
