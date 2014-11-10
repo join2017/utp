@@ -208,7 +208,9 @@ func (c *UTPConn) Write(b []byte) (int, error) {
 			break
 		}
 		if outch, ok := <-c.outch; ok {
+			ulog.Printf(5, "Conn(%v): outch <- &outgoingPacket", c.LocalAddr())
 			outch <- &outgoingPacket{st_data, nil, payload[:l]}
+			ulog.Printf(5, "Conn(%v): ~outch <- &outgoingPacket", c.LocalAddr())
 		} else {
 			return 0, errors.New("use of closed network connection")
 		}
@@ -316,7 +318,9 @@ func (c *UTPConn) loop() {
 				if outch, ok := <-c.outch; ok {
 					select {
 					case b := <-outch:
+						ulog.Printf(5, "Conn(%v): c.sendch <- b", c.LocalAddr())
 						c.sendch <- b
+						ulog.Printf(5, "Conn(%v): ~c.sendch <- b", c.LocalAddr())
 						window -= mtu
 					case w := <-c.winch:
 						window = w
@@ -326,7 +330,9 @@ func (c *UTPConn) loop() {
 					return
 				}
 			} else {
+				ulog.Printf(5, "Conn(%v): window = <-c.winch", c.LocalAddr())
 				window = <-c.winch
+				ulog.Printf(5, "Conn(%v): ~window = <-c.winch", c.LocalAddr())
 			}
 		}
 	}()
@@ -488,7 +494,9 @@ func (c *UTPConn) processPacket(p packet) {
 				wnd = c.maxWindow
 			}
 			ulog.Printf(4, "Conn(%v): Reset window: %d", c.LocalAddr(), wnd)
+			ulog.Printf(5, "Conn(%v): c.winch <- wnd", c.LocalAddr())
 			c.winch <- wnd
+			ulog.Printf(5, "Conn(%v): ~c.winch <- wnd", c.LocalAddr())
 		}
 		if state.state != nil {
 			state.state(c, p)
@@ -499,7 +507,9 @@ func (c *UTPConn) processPacket(p packet) {
 		if c.recvbuf == nil {
 			return
 		}
+		ulog.Printf(5, "Conn(%v): c.sendch <- &outgoingPacket", c.LocalAddr())
 		c.sendch <- &outgoingPacket{st_state, nil, nil}
+		ulog.Printf(5, "Conn(%v): ~c.sendch <- &outgoingPacket", c.LocalAddr())
 		c.recvbuf.push(p)
 		for _, s := range c.recvbuf.sequence() {
 			state := c.getState()
@@ -565,13 +575,17 @@ func (c *UTPConn) getState() state {
 func (c *UTPConn) close() {
 	state := c.getState()
 	if !state.closed {
+		ulog.Printf(5, "Conn(%v): c.recvch <- nil", c.LocalAddr())
 		c.recvch <- nil
+		ulog.Printf(5, "Conn(%v): ~c.recvch <- nil", c.LocalAddr())
 		close(c.exitch)
 		close(c.readch)
 		close(c.finch)
 		c.setState(state_closed)
 		if c.closech != nil {
+			ulog.Printf(5, "Conn(%v): c.closech <- c.sid", c.LocalAddr())
 			c.closech <- c.sid
+			ulog.Printf(5, "Conn(%v): ~c.closech <- c.sid", c.LocalAddr())
 		}
 	}
 }
@@ -598,7 +612,9 @@ var state_closed state = state{
 
 var state_closing state = state{
 	data: func(c *UTPConn, p packet) {
+		ulog.Printf(5, "Conn(%v): c.readch <- append([]byte(nil), p.payload...)", c.LocalAddr())
 		c.readch <- append([]byte(nil), p.payload...)
+		ulog.Printf(5, "Conn(%v): ~c.readch <- append([]byte(nil), p.payload...)", c.LocalAddr())
 		if c.recvbuf.empty() && c.sendbuf.empty() {
 			c.close()
 		}
@@ -624,7 +640,9 @@ var state_syn_sent state = state{
 
 var state_connected state = state{
 	data: func(c *UTPConn, p packet) {
+		ulog.Printf(5, "Conn(%v): c.readch <- append([]byte(nil), p.payload...) 2", c.LocalAddr())
 		c.readch <- append([]byte(nil), p.payload...)
+		ulog.Printf(5, "Conn(%v): ~c.readch <- append([]byte(nil), p.payload...) 2", c.LocalAddr())
 	},
 	fin: func(c *UTPConn, p packet) {
 		if c.recvbuf.empty() && c.sendbuf.empty() {
@@ -635,7 +653,9 @@ var state_connected state = state{
 	},
 	exit: func(c *UTPConn) {
 		if outch, ok := <-c.outch; ok {
+			ulog.Printf(5, "Conn(%v): outch <- &outgoingPacket{st_fin", c.LocalAddr())
 			outch <- &outgoingPacket{st_fin, nil, nil}
+			ulog.Printf(5, "Conn(%v): ~outch <- &outgoingPacket{st_fin", c.LocalAddr())
 		}
 		c.setState(state_fin_sent)
 	},
