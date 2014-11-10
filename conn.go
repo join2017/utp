@@ -359,7 +359,6 @@ func (c *UTPConn) loop() {
 			ulog.Printf(5, "Conn(%v): ~<-c.sendch:", c.LocalAddr())
 
 		case <-time.After(time.Duration(c.rto) * time.Millisecond):
-			ulog.Printf(5, "Conn(%v): <-time.After:", c.LocalAddr())
 			state := c.getState()
 			if !state.active && time.Now().Sub(lastReceived) > reset_timeout {
 				ulog.Printf(2, "Conn(%v): Connection timed out", c.LocalAddr())
@@ -375,7 +374,6 @@ func (c *UTPConn) loop() {
 					c.resendPacket(p)
 				}
 			}
-			ulog.Printf(5, "Conn(%v): ~<-time.After:", c.LocalAddr())
 		case d := <-c.keepalivech:
 			if d <= 0 {
 				keepalive = nil
