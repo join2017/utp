@@ -77,7 +77,9 @@ func dial(n string, laddr, raddr *UTPAddr, timeout time.Duration) (*UTPConn, err
 	go c.recv()
 	go c.loop()
 
+	dog := newWatchDog(time.Second * 10)
 	c.sendch <- &outgoingPacket{st_syn, nil, nil}
+	dog.Stop()
 
 	var t <-chan time.Time
 	if timeout != 0 {
@@ -129,7 +131,9 @@ func (c *UTPConn) Close() error {
 	if state.active && state.exit != nil {
 		state.exit(c)
 		ulog.Printf(2, "Conn(%v): Wait for close", c.LocalAddr())
+		dog := newWatchDog(time.Second * 10)
 		<-c.finch
+		dog.Stop()
 	}
 
 	ulog.Printf(1, "Conn(%v): Closed", c.LocalAddr())
@@ -160,6 +164,8 @@ func (c *UTPConn) Read(b []byte) (int, error) {
 			timeout = time.After(c.rdeadline.Sub(time.Now()))
 		}
 
+		//dog := newWatchDog(time.Second * 60)
+		//defer dog.Stop()
 		select {
 		case b := <-c.readch:
 			if b == nil {
@@ -200,7 +206,9 @@ func (c *UTPConn) Write(b []byte) (int, error) {
 			break
 		}
 		if outch, ok := <-c.outchch; ok {
+			dog := newWatchDog(time.Second * 10)
 			outch <- &outgoingPacket{st_data, nil, payload[:l]}
+			dog.Stop()
 		} else {
 			return 0, errors.New("use of closed network connection")
 		}
@@ -249,7 +257,9 @@ func (c *UTPConn) SetKeepAlive(d time.Duration) error {
 	}
 	state := c.getState()
 	if state.active {
+		dog := newWatchDog(time.Second * 10)
 		c.keepalivech <- d
+		dog.Stop()
 	}
 	return nil
 }
@@ -278,7 +288,9 @@ func (c *UTPConn) recv() {
 		}
 		p, err := readPacket(buf[:len])
 		if err == nil {
+			dog := newWatchDog(time.Second * 10)
 			c.recvch <- &p
+			dog.Stop()
 		}
 	}
 }
@@ -316,7 +328,9 @@ func (c *UTPConn) loop() {
 						c.sendch <- nil
 						return
 					}
+					dog := newWatchDog(time.Second * 10)
 					c.sendch <- b
+					dog.Stop()
 					window -= mtu
 				case w := <-c.winch:
 					window = w
@@ -490,7 +504,9 @@ func (c *UTPConn) processPacket(p packet) bool {
 			}
 			ulog.Printf(4, "Conn(%v): Reset window: %d", c.LocalAddr(), wnd)
 			go func() {
+				dog := newWatchDog(time.Second * 10)
 				c.winch <- wnd
+				dog.Stop()
 			}()
 		}
 		if state.state != nil {
@@ -569,14 +585,18 @@ func (c *UTPConn) getState() state {
 func (c *UTPConn) close() {
 	state := c.getState()
 	if !state.closed {
+		dog := newWatchDog(time.Second * 10)
 		c.recvch <- nil
+		dog.Stop()
 		close(c.exitch)
 		close(c.finch)
 		c.closed()
 
 		// Accepted connection
 		if c.closech != nil {
+			dog := newWatchDog(time.Second * 10)
 			c.closech <- c.sid
+			dog.Stop()
 		}
 	}
 }
@@ -622,7 +642,9 @@ var state_closed state = state{
 var state_closing state = state{
 	data: func(c *UTPConn, p packet) {
 		if readch, ok := <-c.readchch; ok {
+			dog := newWatchDog(time.Second * 10)
 			readch <- append([]byte(nil), p.payload...)
+			dog.Stop()
 		}
 		if c.recvbuf.empty() && c.sendbuf.empty() {
 			c.close()
@@ -639,7 +661,9 @@ var state_syn_sent state = state{
 	state: func(c *UTPConn, p packet) {
 		c.recvbuf = newPacketBuffer(window_size, int(p.header.seq))
 		c.connected()
+		dog := newWatchDog(time.Second * 10)
 		c.connch <- nil
+		dog.Stop()
 	},
 	active: true,
 }
@@ -647,7 +671,9 @@ var state_syn_sent state = state{
 var state_connected state = state{
 	data: func(c *UTPConn, p packet) {
 		if readch, ok := <-c.readchch; ok {
+			dog := newWatchDog(time.Second * 10)
 			readch <- append([]byte(nil), p.payload...)
+			dog.Stop()
 		}
 	},
 	fin: func(c *UTPConn, p packet) {
@@ -659,7 +685,9 @@ var state_connected state = state{
 	},
 	exit: func(c *UTPConn) {
 		if outch, ok := <-c.outchch; ok {
+			dog := newWatchDog(time.Second * 10)
 			outch <- &outgoingPacket{st_fin, nil, nil}
+			dog.Stop()
 		}
 		c.fin_sent()
 	},
