@@ -34,7 +34,7 @@ func ListenUTP(n string, laddr *UTPAddr) (*UTPListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := listenPacket(udpnet, laddr.addr.String())
+	conn, err := listenPacket(udpnet, laddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (l *UTPListener) processPacket(p packet, addr net.Addr) {
 
 			c := newUTPConn()
 			c.Conn = l.Conn
-			c.raddr = addr
+			c.raddr = &UTPAddr{UDPAddr: addr.(*net.UDPAddr)}
 			c.rid = p.header.id + 1
 			c.sid = p.header.id
 			c.seq = uint16(seq)
@@ -184,7 +184,7 @@ func (l *UTPListener) AcceptUTP() (*UTPConn, error) {
 }
 
 func (l *UTPListener) Addr() net.Addr {
-	return &UTPAddr{addr: l.Conn.LocalAddr()}
+	return &UTPAddr{UDPAddr: l.Conn.LocalAddr().(*net.UDPAddr)}
 }
 
 func (l *UTPListener) Close() error {

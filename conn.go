@@ -71,10 +71,10 @@ func dial(n string, laddr, raddr *UTPAddr, timeout time.Duration) (*UTPConn, err
 		if err != nil {
 			return nil, err
 		}
-		laddr = &UTPAddr{addr: addr}
+		laddr = &UTPAddr{UDPAddr: addr}
 	}
 
-	conn, err := net.ListenPacket(udpnet, laddr.addr.String())
+	conn, err := net.ListenPacket(udpnet, laddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func dial(n string, laddr, raddr *UTPAddr, timeout time.Duration) (*UTPConn, err
 
 	c := newUTPConn()
 	c.Conn = conn
-	c.raddr = raddr.addr
+	c.raddr = raddr
 	c.rid = id
 	c.sid = id + 1
 	c.seq = 1
@@ -168,11 +168,11 @@ func (c *UTPConn) Close() error {
 }
 
 func (c *UTPConn) LocalAddr() net.Addr {
-	return &UTPAddr{addr: c.Conn.LocalAddr().(*net.UDPAddr)}
+	return &UTPAddr{UDPAddr: c.Conn.LocalAddr().(*net.UDPAddr)}
 }
 
 func (c *UTPConn) RemoteAddr() net.Addr {
-	return &UTPAddr{addr: c.raddr}
+	return c.raddr
 }
 
 func (c *UTPConn) Read(b []byte) (int, error) {
@@ -424,7 +424,7 @@ func (c *UTPConn) sendPacket(b outgoingPacket) {
 	if err == nil {
 		ulog.Printf(3, "SEND %v -> %v: %v", c.Conn.LocalAddr(), c.raddr, p.String())
 		c.stat.sentPackets++
-		_, err = c.Conn.WriteTo(bin, c.raddr)
+		_, err = c.Conn.WriteTo(bin, c.raddr.(*UTPAddr).UDPAddr)
 		if err != nil {
 			return
 		}
@@ -439,7 +439,7 @@ func (c *UTPConn) resendPacket(p packet) {
 	if err == nil {
 		ulog.Printf(3, "RESEND %v -> %v: %v", c.Conn.LocalAddr(), c.raddr, p.String())
 		c.stat.resentPackets++
-		_, err = c.Conn.WriteTo(bin, c.raddr)
+		_, err = c.Conn.WriteTo(bin, c.raddr.(*UTPAddr).UDPAddr)
 		if err != nil {
 			return
 		}
