@@ -285,7 +285,9 @@ func (c *UTPConn) SetKeepAlive(d time.Duration) error {
 }
 
 func readPacket(data []byte) (*packet, error) {
-	var p packet
+	p := &packet{
+		payload: make([]byte, 0, mss),
+	}
 	err := p.UnmarshalBinary(data)
 	if err != nil {
 		return nil, err
@@ -293,7 +295,7 @@ func readPacket(data []byte) (*packet, error) {
 	if p.header.ver != version {
 		return nil, errors.New("unsupported header version")
 	}
-	return &p, nil
+	return p, nil
 }
 
 func (c *UTPConn) recv() {
@@ -608,7 +610,9 @@ func (c *UTPConn) makePacket(b *outgoingPacket) *packet {
 	if !(b.typ == st_state && len(b.payload) == 0) {
 		c.seq++
 	}
-	return &packet{header: h, payload: b.payload}
+	p := &packet{header: h, payload: make([]byte, len(b.payload), mss)}
+	copy(p.payload, b.payload)
+	return p
 }
 
 func (c *UTPConn) close() {

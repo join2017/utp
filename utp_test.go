@@ -423,7 +423,7 @@ func TestPacketBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p2 := packet{}
+	p2 := packet{payload: make([]byte, 0, mss)}
 	err = p2.UnmarshalBinary(b)
 	if err != nil {
 		t.Fatal(err)
@@ -545,7 +545,7 @@ func TestPacketBuffer(t *testing.T) {
 	}
 
 	for i := 7; i <= size; i++ {
-	 	f := b.fetch(uint16(i))
+		f := b.fetch(uint16(i))
 		if f == nil {
 			t.Fatal("fetch should not fail")
 		}

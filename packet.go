@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 )
 
 type header struct {
@@ -172,11 +171,16 @@ func (p *packet) UnmarshalBinary(data []byte) error {
 
 	p.header.typ = int((tv >> 4) & 0xF)
 	p.header.ver = int(tv & 0xF)
-	b, err := ioutil.ReadAll(buf)
-	if err != nil {
-		return err
+
+	l := buf.Len()
+	if l > 0 {
+		p.payload = p.payload[:l]
+		_, err := buf.Read(p.payload[:])
+		if err != nil {
+			return err
+		}
 	}
-	p.payload = b
+
 	return nil
 }
 
