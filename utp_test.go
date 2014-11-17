@@ -527,9 +527,9 @@ func TestPacketBuffer(t *testing.T) {
 		t.Errorf("expected %d packets sequence; got %d", size, len(all))
 	}
 
-	_, err = b.fetch(6)
-	if err != nil {
-		t.Fatal(err)
+	f := b.fetch(6)
+	if f == nil {
+		t.Fatal("fetch should not fail")
 	}
 
 	b.compact()
@@ -545,9 +545,9 @@ func TestPacketBuffer(t *testing.T) {
 	}
 
 	for i := 7; i <= size; i++ {
-		_, err := b.fetch(uint16(i))
-		if err != nil {
-			t.Fatal(err)
+	 	f := b.fetch(uint16(i))
+		if f == nil {
+			t.Fatal("fetch should not fail")
 		}
 	}
 

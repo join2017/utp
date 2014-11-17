@@ -52,7 +52,7 @@ func (b *packetBuffer) push(p *packet) error {
 	return nil
 }
 
-func (b *packetBuffer) fetch(id uint16) (*packet, error) {
+func (b *packetBuffer) fetch(id uint16) *packet {
 	for p := b.root; p != nil; p = p.next {
 		if p.p != nil {
 			if p.p.header.seq < id {
@@ -60,11 +60,11 @@ func (b *packetBuffer) fetch(id uint16) (*packet, error) {
 			} else if p.p.header.seq == id {
 				r := p.p
 				p.p = nil
-				return r, nil
+				return r
 			}
 		}
 	}
-	return nil, errors.New("not found")
+	return nil
 }
 
 func (b *packetBuffer) compact() {
@@ -84,11 +84,11 @@ func (b *packetBuffer) all() []*packet {
 	return a
 }
 
-func (b *packetBuffer) first() (*packet, error) {
+func (b *packetBuffer) first() *packet {
 	if b.root == nil || b.root.p == nil {
-		return nil, errors.New("no first packet")
+		return nil
 	}
-	return b.root.p, nil
+	return b.root.p
 }
 
 func (b *packetBuffer) frontPushedTime() (time.Time, error) {

@@ -22,9 +22,9 @@ type UTPConn struct {
 	state        state
 	lastTimedOut time.Time
 
-	outch       chan outgoingPacket
+	outch       chan *outgoingPacket
 	outchch     chan int
-	sendch      chan outgoingPacket
+	sendch      chan *outgoingPacket
 	sendchch    chan int
 	recvch      chan *packet
 	recvchch    chan int
@@ -94,7 +94,7 @@ func dial(n string, laddr, raddr *UTPAddr, timeout time.Duration) (*UTPConn, err
 	go c.loop()
 
 	select {
-	case c.sendch <- outgoingPacket{st_syn, nil, nil}:
+	case c.sendch <- &outgoingPacket{st_syn, nil, nil}:
 	case <-c.sendchch:
 		return nil, errors.New("use of closed network connection")
 	}
@@ -126,9 +126,9 @@ func newUTPConn() *UTPConn {
 		maxWindow: mtu,
 		rto:       int64(rto),
 
-		outch:    make(chan outgoingPacket, 1),
+		outch:    make(chan *outgoingPacket, 1),
 		outchch:  make(chan int),
-		sendch:   make(chan outgoingPacket, 1),
+		sendch:   make(chan *outgoingPacket, 1),
 		sendchch: make(chan int),
 		recvch:   make(chan *packet, 2),
 		recvchch: make(chan int),
@@ -228,7 +228,7 @@ func (c *UTPConn) Write(b []byte) (int, error) {
 		var payload [mss]byte
 		l := copy(payload[:], b[wrote:])
 		select {
-		case c.outch <- outgoingPacket{st_data, nil, payload[:l]}:
+		case c.outch <- &outgoingPacket{st_data, nil, payload[:l]}:
 		case <-c.outchch:
 			return 0, errors.New("use of closed network connection")
 		}
@@ -361,7 +361,7 @@ func (c *UTPConn) loop() {
 			ack := c.processPacket(p)
 			lastReceived = time.Now()
 			if ack {
-				out := outgoingPacket{st_state, nil, nil}
+				out := &outgoingPacket{st_state, nil, nil}
 				selack := c.sendbuf.generateSelectiveACK()
 				if len(selack) > 0 {
 					out.ext = []extension{
@@ -381,7 +381,7 @@ func (c *UTPConn) loop() {
 		case <-time.After(time.Duration(c.rto) * time.Millisecond):
 			if !c.state.active && time.Now().Sub(lastReceived) > reset_timeout {
 				ulog.Printf(2, "Conn(%v): Connection timed out", c.LocalAddr())
-				c.sendPacket(outgoingPacket{st_reset, nil, nil})
+				c.sendPacket(&outgoingPacket{st_reset, nil, nil})
 				c.close()
 			} else {
 				t, err := c.sendbuf.frontPushedTime()
@@ -405,7 +405,7 @@ func (c *UTPConn) loop() {
 			}
 		case <-keepalive:
 			ulog.Printf(2, "Conn(%v): Send keepalive", c.LocalAddr())
-			c.sendPacket(outgoingPacket{st_state, nil, nil})
+			c.sendPacket(&outgoingPacket{st_state, nil, nil})
 
 		case <-c.quitch:
 			if c.state.exit != nil {
@@ -418,7 +418,7 @@ func (c *UTPConn) loop() {
 	}
 }
 
-func (c *UTPConn) sendPacket(b outgoingPacket) {
+func (c *UTPConn) sendPacket(b *outgoingPacket) {
 	p := c.makePacket(b)
 	bin, err := p.MarshalBinary()
 	if err == nil {
@@ -470,8 +470,8 @@ func (c *UTPConn) processPacket(p *packet) bool {
 
 	if p.header.typ == st_state {
 
-		f, err := c.sendbuf.first()
-		if err != nil && p.header.ack == f.header.seq {
+		f := c.sendbuf.first()
+		if f != nil && p.header.ack == f.header.seq {
 			for _, e := range p.ext {
 				if e.typ == ext_selective_ack {
 					ulog.Printf(3, "Conn(%v): Receive Selective ACK", c.LocalAddr())
@@ -481,8 +481,8 @@ func (c *UTPConn) processPacket(p *packet) bool {
 			}
 		}
 
-		s, err := c.sendbuf.fetch(p.header.ack)
-		if err == nil {
+		s := c.sendbuf.fetch(p.header.ack)
+		if s != nil {
 			current := currentMicrosecond()
 			if current > s.header.t {
 				e := int64(current-s.header.t) / 1000
@@ -526,8 +526,8 @@ func (c *UTPConn) processPacket(p *packet) bool {
 			if c.dupAck >= 2 {
 				ulog.Printf(3, "Conn(%v): Receive 3 duplicated acks: %d", c.LocalAddr(), p.header.ack)
 				c.stat.receivedDuplicatedACKs++
-				p, err := c.sendbuf.first()
-				if err == nil {
+				p := c.sendbuf.first()
+				if p != nil {
 					c.maxWindow /= 2
 					if c.maxWindow < mtu {
 						c.maxWindow = mtu
@@ -583,7 +583,7 @@ func (c *UTPConn) processPacket(p *packet) bool {
 	return ack
 }
 
-func (c *UTPConn) makePacket(b outgoingPacket) *packet {
+func (c *UTPConn) makePacket(b *outgoingPacket) *packet {
 	wnd := window_size * mtu
 	if c.recvbuf != nil {
 		wnd = c.recvbuf.space() * mtu
@@ -721,7 +721,7 @@ var state_connected state = state{
 	exit: func(c *UTPConn) {
 		go func() {
 			select {
-			case c.outch <- outgoingPacket{st_fin, nil, nil}:
+			case c.outch <- &outgoingPacket{st_fin, nil, nil}:
 			case <-c.outchch:
 			}
 		}()
