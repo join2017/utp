@@ -83,7 +83,14 @@ func (l *UTPListener) listen() {
 				select {
 				case <-raw.closed:
 				default:
-					raw.in <- rawIncoming{b: buf[:len], addr: addr}
+					i := rawIncoming{b: buf[:len], addr: addr}
+					select {
+						case raw.in <- i:
+						default:
+							// discard the oldest packet
+							<-raw.in
+							raw.in <- i
+					}
 				}
 			}
 		}
