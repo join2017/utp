@@ -74,16 +74,6 @@ func (b *packetBuffer) compact() {
 	}
 }
 
-func (b *packetBuffer) all() []*packet {
-	var a []*packet
-	for p := b.root; p != nil; p = p.next {
-		if p.p != nil {
-			a = append(a, p.p)
-		}
-	}
-	return a
-}
-
 func (b *packetBuffer) first() *packet {
 	if b.root == nil || b.root.p == nil {
 		return nil
@@ -126,6 +116,17 @@ func (b *packetBuffer) space() int {
 
 func (b *packetBuffer) empty() bool {
 	return b.root == nil
+}
+
+// test use only
+func (b *packetBuffer) all() []*packet {
+	var a []*packet
+	for p := b.root; p != nil; p = p.next {
+		if p.p != nil {
+			a = append(a, p.p)
+		}
+	}
+	return a
 }
 
 func (b *packetBuffer) generateSelectiveACK() []byte {

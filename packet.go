@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 )
 
 type header struct {
@@ -201,4 +202,39 @@ func (p packet) String() string {
 	s += fmt.Sprintf(" seq:%d ack:%d len:%d", p.header.seq, p.header.ack, len(p.payload))
 	s += "]"
 	return s
+}
+
+var globalPool packetPool
+
+type packetPool struct {
+	root  *packetPoolNode
+	mutex sync.Mutex
+}
+
+type packetPoolNode struct {
+	p    *packet
+	next *packetPoolNode
+}
+
+func (o *packetPool) get() *packet {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	r := o.root
+	if r != nil {
+		o.root = o.root.next
+		return r.p
+	} else {
+		return &packet{
+			payload: make([]byte, 0, mss),
+		}
+	}
+}
+
+func (o *packetPool) put(p *packet) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	o.root = &packetPoolNode{
+		p:    p,
+		next: o.root,
+	}
 }

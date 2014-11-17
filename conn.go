@@ -225,15 +225,17 @@ func (c *UTPConn) Write(b []byte) (int, error) {
 
 	var wrote uint64
 	for {
-		var payload [mss]byte
-		l := copy(payload[:], b[wrote:])
+		l := uint64(len(b)) - wrote
+		if l > mss {
+			l = mss
+		}
 		select {
-		case c.outch <- &outgoingPacket{st_data, nil, payload[:l]}:
+		case c.outch <- &outgoingPacket{st_data, nil, b[wrote : wrote+l]}:
 		case <-c.outchch:
 			return 0, errors.New("use of closed network connection")
 		}
 
-		wrote += uint64(l)
+		wrote += l
 		ulog.Printf(4, "Conn(%v): Write %d/%d bytes", c.LocalAddr(), wrote, len(b))
 		if l < mss {
 			break
@@ -285,9 +287,7 @@ func (c *UTPConn) SetKeepAlive(d time.Duration) error {
 }
 
 func readPacket(data []byte) (*packet, error) {
-	p := &packet{
-		payload: make([]byte, 0, mss),
-	}
+	p := globalPool.get()
 	err := p.UnmarshalBinary(data)
 	if err != nil {
 		return nil, err
@@ -432,6 +432,8 @@ func (c *UTPConn) sendPacket(b *outgoingPacket) {
 		}
 		if b.typ != st_state {
 			c.sendbuf.push(p)
+		} else {
+			globalPool.put(p)
 		}
 	}
 }
@@ -521,6 +523,7 @@ func (c *UTPConn) processPacket(p *packet) bool {
 				}
 				ulog.Printf(4, "Conn(%v): Update maxWindow: %d", c.LocalAddr(), c.maxWindow)
 			}
+			globalPool.put(s)
 		}
 		c.sendbuf.compact()
 		if c.lastAck == p.header.ack {
@@ -556,7 +559,9 @@ func (c *UTPConn) processPacket(p *packet) bool {
 		if c.state.state != nil {
 			c.state.state(c, p)
 		}
+		globalPool.put(p)
 	} else if p.header.typ == st_reset {
+		globalPool.put(p)
 		c.close()
 	} else {
 		if c.recvbuf == nil {
@@ -580,6 +585,7 @@ func (c *UTPConn) processPacket(p *packet) bool {
 					c.state.state(c, s)
 				}
 			}
+			globalPool.put(s)
 		}
 	}
 	return ack
@@ -594,23 +600,22 @@ func (c *UTPConn) makePacket(b *outgoingPacket) *packet {
 	if b.typ == st_syn {
 		id = c.rid
 	}
-	h := header{
-		typ:  b.typ,
-		ver:  version,
-		id:   id,
-		t:    currentMicrosecond(),
-		diff: c.diff,
-		wnd:  uint32(wnd),
-		seq:  c.seq,
-		ack:  c.ack,
-	}
+	p := globalPool.get()
+	p.header.typ = b.typ
+	p.header.ver = version
+	p.header.id = id
+	p.header.t = currentMicrosecond()
+	p.header.diff = c.diff
+	p.header.wnd = uint32(wnd)
+	p.header.seq = c.seq
+	p.header.ack = c.ack
 	if b.typ == st_fin {
 		c.eofid = c.seq
 	}
 	if !(b.typ == st_state && len(b.payload) == 0) {
 		c.seq++
 	}
-	p := &packet{header: h, payload: make([]byte, len(b.payload), mss)}
+	p.payload = p.payload[:len(b.payload)]
 	copy(p.payload, b.payload)
 	return p
 }
@@ -685,7 +690,7 @@ var state_closed state = state{
 var state_closing state = state{
 	data: func(c *UTPConn, p *packet) {
 		select {
-		case c.readch <- p.payload:
+		case c.readch <- append([]byte(nil), p.payload...):
 		case <-c.readchch:
 		}
 		if c.recvbuf.empty() && c.sendbuf.empty() {
@@ -711,7 +716,7 @@ var state_syn_sent state = state{
 var state_connected state = state{
 	data: func(c *UTPConn, p *packet) {
 		select {
-		case c.readch <- p.payload:
+		case c.readch <- append([]byte(nil), p.payload...):
 		case <-c.readchch:
 		}
 	},
