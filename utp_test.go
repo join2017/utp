@@ -504,7 +504,7 @@ func TestPacketBuffer(t *testing.T) {
 	}
 
 	for i := 1; i <= size; i++ {
-		b.push(packet{header: header{seq: uint16(i)}})
+		b.push(&packet{header: header{seq: uint16(i)}})
 	}
 
 	if b.space() != 0 {
@@ -517,7 +517,7 @@ func TestPacketBuffer(t *testing.T) {
 		t.Errorf("expected ack == %v; got %v", a, ack)
 	}
 
-	err := b.push(packet{header: header{seq: 15}})
+	err := b.push(&packet{header: header{seq: 15}})
 	if err == nil {
 		t.Fatal("push should fail")
 	}
@@ -534,12 +534,12 @@ func TestPacketBuffer(t *testing.T) {
 
 	b.compact()
 
-	err = b.push(packet{header: header{seq: 15}})
+	err = b.push(&packet{header: header{seq: 15}})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = b.push(packet{header: header{seq: 17}})
+	err = b.push(&packet{header: header{seq: 17}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,7 +580,7 @@ func TestPacketBufferBoundary(t *testing.T) {
 	begin := math.MaxUint16 - 3
 	b := newPacketBuffer(12, begin)
 	for i := begin; i != 5; i = (i + 1) % (math.MaxUint16 + 1) {
-		err := b.push(packet{header: header{seq: uint16(i)}})
+		err := b.push(&packet{header: header{seq: uint16(i)}})
 		if err != nil {
 			t.Fatal(err)
 		}

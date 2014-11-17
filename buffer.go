@@ -25,7 +25,7 @@ func newPacketBuffer(size, begin int) *packetBuffer {
 	}
 }
 
-func (b *packetBuffer) push(p packet) error {
+func (b *packetBuffer) push(p *packet) error {
 	if int(p.header.seq) > b.begin+b.size-1 {
 		return errors.New("out of bounds")
 	} else if int(p.header.seq) < b.begin {
@@ -40,7 +40,7 @@ func (b *packetBuffer) push(p packet) error {
 	i := b.begin
 	for {
 		if i == int(p.header.seq) {
-			n.p = &p
+			n.p = p
 			n.pushed = time.Now()
 			return nil
 		} else if n.next == nil {
@@ -52,19 +52,19 @@ func (b *packetBuffer) push(p packet) error {
 	return nil
 }
 
-func (b *packetBuffer) fetch(id uint16) (packet, error) {
+func (b *packetBuffer) fetch(id uint16) (*packet, error) {
 	for p := b.root; p != nil; p = p.next {
 		if p.p != nil {
 			if p.p.header.seq < id {
 				p.p = nil
 			} else if p.p.header.seq == id {
-				r := *p.p
+				r := p.p
 				p.p = nil
 				return r, nil
 			}
 		}
 	}
-	return packet{}, errors.New("not found")
+	return nil, errors.New("not found")
 }
 
 func (b *packetBuffer) compact() {
@@ -74,21 +74,21 @@ func (b *packetBuffer) compact() {
 	}
 }
 
-func (b *packetBuffer) all() []packet {
-	var a []packet
+func (b *packetBuffer) all() []*packet {
+	var a []*packet
 	for p := b.root; p != nil; p = p.next {
 		if p.p != nil {
-			a = append(a, *p.p)
+			a = append(a, p.p)
 		}
 	}
 	return a
 }
 
-func (b *packetBuffer) first() (packet, error) {
+func (b *packetBuffer) first() (*packet, error) {
 	if b.root == nil || b.root.p == nil {
-		return packet{}, errors.New("no first packet")
+		return nil, errors.New("no first packet")
 	}
-	return *b.root.p, nil
+	return b.root.p, nil
 }
 
 func (b *packetBuffer) frontPushedTime() (time.Time, error) {
@@ -98,20 +98,20 @@ func (b *packetBuffer) frontPushedTime() (time.Time, error) {
 	return b.root.pushed, nil
 }
 
-func (b *packetBuffer) fetchSequence() []packet {
-	var a []packet
+func (b *packetBuffer) fetchSequence() []*packet {
+	var a []*packet
 	for ; b.root != nil && b.root.p != nil; b.root = b.root.next {
-		a = append(a, *b.root.p)
+		a = append(a, b.root.p)
 		b.begin = (b.begin + 1) % (math.MaxUint16 + 1)
 	}
 	return a
 }
 
-func (b *packetBuffer) sequence() []packet {
-	var a []packet
+func (b *packetBuffer) sequence() []*packet {
+	var a []*packet
 	n := b.root
 	for ; n != nil && n.p != nil; n = n.next {
-		a = append(a, *n.p)
+		a = append(a, n.p)
 	}
 	return a
 }

@@ -26,7 +26,7 @@ type UTPConn struct {
 	outchch     chan int
 	sendch      chan outgoingPacket
 	sendchch    chan int
-	recvch      chan packet
+	recvch      chan *packet
 	recvchch    chan int
 	readch      chan []byte
 	readchch    chan int
@@ -130,7 +130,7 @@ func newUTPConn() *UTPConn {
 		outchch:  make(chan int),
 		sendch:   make(chan outgoingPacket, 1),
 		sendchch: make(chan int),
-		recvch:   make(chan packet, 2),
+		recvch:   make(chan *packet, 2),
 		recvchch: make(chan int),
 		winch:    make(chan uint32, 1),
 		quitch:   make(chan int),
@@ -284,16 +284,16 @@ func (c *UTPConn) SetKeepAlive(d time.Duration) error {
 	return nil
 }
 
-func readPacket(data []byte) (packet, error) {
+func readPacket(data []byte) (*packet, error) {
 	var p packet
 	err := p.UnmarshalBinary(data)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	if p.header.ver != version {
-		return p, errors.New("unsupported header version")
+		return nil, errors.New("unsupported header version")
 	}
-	return p, nil
+	return &p, nil
 }
 
 func (c *UTPConn) recv() {
@@ -429,12 +429,12 @@ func (c *UTPConn) sendPacket(b outgoingPacket) {
 			return
 		}
 		if b.typ != st_state {
-			c.sendbuf.push(*p)
+			c.sendbuf.push(p)
 		}
 	}
 }
 
-func (c *UTPConn) resendPacket(p packet) {
+func (c *UTPConn) resendPacket(p *packet) {
 	bin, err := p.MarshalBinary()
 	if err == nil {
 		ulog.Printf(3, "RESEND %v -> %v: %v", c.conn.LocalAddr(), c.raddr, p.String())
@@ -450,7 +450,7 @@ func currentMicrosecond() uint32 {
 	return uint32(time.Now().Nanosecond() / 1000)
 }
 
-func (c *UTPConn) processPacket(p packet) bool {
+func (c *UTPConn) processPacket(p *packet) bool {
 	var ack bool
 
 	if p.header.t == 0 {
@@ -666,9 +666,9 @@ func (c *UTPConn) fin_sent() {
 }
 
 type state struct {
-	data   func(c *UTPConn, p packet)
-	fin    func(c *UTPConn, p packet)
-	state  func(c *UTPConn, p packet)
+	data   func(c *UTPConn, p *packet)
+	fin    func(c *UTPConn, p *packet)
+	state  func(c *UTPConn, p *packet)
 	exit   func(c *UTPConn)
 	active bool
 	closed bool
@@ -679,7 +679,7 @@ var state_closed state = state{
 }
 
 var state_closing state = state{
-	data: func(c *UTPConn, p packet) {
+	data: func(c *UTPConn, p *packet) {
 		select {
 		case c.readch <- p.payload:
 		case <-c.readchch:
@@ -688,7 +688,7 @@ var state_closing state = state{
 			c.close()
 		}
 	},
-	state: func(c *UTPConn, p packet) {
+	state: func(c *UTPConn, p *packet) {
 		if c.recvbuf.empty() && c.sendbuf.empty() {
 			c.close()
 		}
@@ -696,7 +696,7 @@ var state_closing state = state{
 }
 
 var state_syn_sent state = state{
-	state: func(c *UTPConn, p packet) {
+	state: func(c *UTPConn, p *packet) {
 		c.recvbuf = newPacketBuffer(window_size, int(p.header.seq))
 		c.connected()
 		c.connch <- nil
@@ -705,13 +705,13 @@ var state_syn_sent state = state{
 }
 
 var state_connected state = state{
-	data: func(c *UTPConn, p packet) {
+	data: func(c *UTPConn, p *packet) {
 		select {
 		case c.readch <- p.payload:
 		case <-c.readchch:
 		}
 	},
-	fin: func(c *UTPConn, p packet) {
+	fin: func(c *UTPConn, p *packet) {
 		if c.recvbuf.empty() && c.sendbuf.empty() {
 			c.close()
 		} else {
@@ -731,7 +731,7 @@ var state_connected state = state{
 }
 
 var state_fin_sent state = state{
-	state: func(c *UTPConn, p packet) {
+	state: func(c *UTPConn, p *packet) {
 		if p.header.ack == c.eofid {
 			if c.recvbuf.empty() && c.sendbuf.empty() {
 				c.close()

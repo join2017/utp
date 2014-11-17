@@ -12,7 +12,7 @@ import (
 type UTPListener struct {
 	// RawConn represents an out-of-bounds connection.
 	// This allows a single socket to handle multiple protocols.
-	RawConn  net.PacketConn
+	RawConn net.PacketConn
 
 	conn     net.PacketConn
 	conns    map[uint16]*UTPConn
@@ -59,7 +59,7 @@ func ListenUTP(n string, laddr *UTPAddr) (*UTPListener, error) {
 }
 
 type incoming struct {
-	p    packet
+	p    *packet
 	addr net.Addr
 }
 
@@ -123,7 +123,7 @@ func listenPacket(n, addr string) (net.PacketConn, error) {
 	return net.ListenPacket(n, addr)
 }
 
-func (l *UTPListener) processPacket(p packet, addr net.Addr) {
+func (l *UTPListener) processPacket(p *packet, addr net.Addr) {
 	switch p.header.typ {
 	case st_data, st_fin, st_state, st_reset:
 		if c, ok := l.conns[p.header.id]; ok {
