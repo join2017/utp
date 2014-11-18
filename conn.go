@@ -710,6 +710,15 @@ var state_syn_sent state = state{
 		c.connected()
 		c.connch <- nil
 	},
+	exit: func(c *UTPConn) {
+		go func() {
+			select {
+			case c.outch <- &outgoingPacket{st_fin, nil, nil}:
+			case <-c.outchch:
+			}
+		}()
+		c.fin_sent()
+	},
 	active: true,
 }
 

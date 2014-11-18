@@ -10,7 +10,7 @@ import (
 )
 
 type UTPListener struct {
-	// RawConn represents an out-of-bounds connection.
+	// RawConn represents an out-of-band connection.
 	// This allows a single socket to handle multiple protocols.
 	RawConn net.PacketConn
 
@@ -102,7 +102,7 @@ func (l *UTPListener) listen() {
 			case i := <-inch:
 				l.processPacket(i.p, i.addr)
 			case <-l.closech:
-				ulog.Printf(2, "Listener(%v): Stop litening", l.conn.LocalAddr())
+				ulog.Printf(2, "Listener(%v): Stop listening", l.conn.LocalAddr())
 				close(l.accept)
 				l.closed = true
 			case id := <-l.connch:
