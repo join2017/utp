@@ -223,6 +223,7 @@ func (c *UTPConn) Write(b []byte) (int, error) {
 		return 0, syscall.EINVAL
 	}
 
+	b = append([]byte{}, b...)
 	var wrote uint64
 	for {
 		l := uint64(len(b)) - wrote
