@@ -143,7 +143,6 @@ func (l *UTPListener) processPacket(p *packet, addr net.Addr) {
 		if l.closed {
 			return
 		}
-		sid := p.header.id + 1
 		if _, ok := l.conns[p.header.id]; !ok {
 			seq := rand.Intn(math.MaxUint16)
 
@@ -166,8 +165,8 @@ func (l *UTPListener) processPacket(p *packet, addr net.Addr) {
 			case <-c.recvchch:
 			}
 
-			l.conns[sid] = c
-			ulog.Printf(2, "Listener(%v): New incoming connection #%d from %v (alive: %d)", l.conn.LocalAddr(), sid, addr, len(l.conns))
+			l.conns[c.rid] = c
+			ulog.Printf(2, "Listener(%v): New incoming connection #%d from %v (alive: %d)", l.conn.LocalAddr(), c.rid, addr, len(l.conns))
 
 			l.accept <- c
 		}
