@@ -296,6 +296,7 @@ func (r *byteRingBuffer) empty() bool {
 func (r *byteRingBuffer) Write(b []byte) (int, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
 	for _, c := range b {
 		r.b[(r.begin+r.s)%len(r.b)] = c
 		if r.s < len(r.b) {
@@ -304,6 +305,7 @@ func (r *byteRingBuffer) Write(b []byte) (int, error) {
 			r.begin = (r.begin + 1) % len(r.b)
 		}
 	}
+
 	select {
 	case r.rch <- 0:
 	case <-r.closech:
@@ -333,11 +335,15 @@ func (r *byteRingBuffer) ReadTimeout(b []byte, timeout time.Duration) (int, erro
 	}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	for i := 0; i < l; i++ {
-		b[i] = r.b[r.begin]
-		r.begin = (r.begin + 1) % len(r.b)
-		r.s--
+	if r.begin+l > len(r.b) {
+		n := copy(b, r.b[r.begin:])
+		n = copy(b[n:], r.b[:])
+		r.begin = n
+	} else {
+		copy(b, r.b[r.begin:r.begin+l])
+		r.begin = (r.begin + l) % len(r.b)
 	}
+	r.s -= l
 	return l, nil
 }
 
