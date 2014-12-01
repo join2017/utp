@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"../../utp"
 	"github.com/ThomasRooney/gexpect"
+	"github.com/h2so5/utp"
 )
 
 func TestUcatListen(t *testing.T) {
@@ -19,7 +19,10 @@ func TestUcatListen(t *testing.T) {
 	}
 
 	time.Sleep(500 * time.Millisecond)
-	addr, err := utp.ResolveUTPAddr("utp", "127.0.0.1:8000")
+	addr, err := utp.ResolveAddr("utp", "127.0.0.1:8000")
+	if err != nil {
+		t.Fatal(err)
+	}
 	c, err := utp.DialUTPTimeout("utp", nil, addr, 1000*time.Millisecond)
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +46,7 @@ func TestUcatListen(t *testing.T) {
 	}
 
 	child.SendLine(msg + "\n")
+
 	err = c.SetDeadline(time.Now().Add(1000 * time.Millisecond))
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +67,11 @@ func TestUcatListen(t *testing.T) {
 }
 
 func TestUcatConnect(t *testing.T) {
-	ln, err := utp.Listen("utp", "127.0.0.1:9000")
+	addr, err := utp.ResolveAddr("utp", "127.0.0.1:9000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := utp.Listen("utp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}

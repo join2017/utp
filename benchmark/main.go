@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"sync"
 	"time"
 
@@ -85,25 +86,36 @@ func main() {
 }
 
 func c2s(l int64, stream bool) float64 {
-	ln, err := utp.Listen("utp", "127.0.0.1:0")
+	laddr, err := utp.ResolveAddr("utp", ":0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ln, err := utp.Listen("utp", laddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	raddr, err := utp.ResolveUTPAddr("utp", ln.Addr().String())
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		log.Fatal(err)
+	}
+	raddr, err := utp.ResolveAddr("utp", net.JoinHostPort("::1", port))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
+	cch := make(chan *utp.Conn)
+	go func() {
+		c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	if err != nil {
-		log.Fatal(err)
-	}
+		if err != nil {
+			log.Fatal(err)
+		}
+		cch <- c
+	}()
 
 	s, err := ln.Accept()
 	if err != nil {
@@ -111,6 +123,9 @@ func c2s(l int64, stream bool) float64 {
 	}
 	defer s.Close()
 	ln.Close()
+
+	c := <-cch
+	defer c.Close()
 
 	rch := make(chan int)
 
@@ -180,25 +195,36 @@ func c2s(l int64, stream bool) float64 {
 }
 
 func s2c(l int64, stream bool) float64 {
-	ln, err := utp.Listen("utp", "127.0.0.1:0")
+	laddr, err := utp.ResolveAddr("utp", ":0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ln, err := utp.Listen("utp", laddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	raddr, err := utp.ResolveUTPAddr("utp", ln.Addr().String())
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		log.Fatal(err)
+	}
+	raddr, err := utp.ResolveAddr("utp", net.JoinHostPort("::1", port))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
+	cch := make(chan *utp.Conn)
+	go func() {
+		c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	if err != nil {
-		log.Fatal(err)
-	}
+		if err != nil {
+			log.Fatal(err)
+		}
+		cch <- c
+	}()
 
 	s, err := ln.Accept()
 	if err != nil {
@@ -206,6 +232,9 @@ func s2c(l int64, stream bool) float64 {
 	}
 	defer s.Close()
 	ln.Close()
+
+	c := <-cch
+	defer c.Close()
 
 	rch := make(chan int)
 
