@@ -297,15 +297,19 @@ func (r *byteRingBuffer) Write(b []byte) (int, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	for _, c := range b {
-		r.b[(r.begin+r.s)%len(r.b)] = c
-		if r.s < len(r.b) {
-			r.s++
+	for len(b) > 0 {
+		end := (r.begin + r.s) % len(r.b)
+		n := copy(r.b[end:], b)
+		b = b[n:]
+
+		s := r.s + n
+		if s > len(r.b) {
+			r.begin = (r.begin + s - len(r.b)) % len(r.b)
+			r.s = len(r.b)
 		} else {
-			r.begin = (r.begin + 1) % len(r.b)
+			r.s += n
 		}
 	}
-
 	select {
 	case r.rch <- 0:
 	case <-r.closech:
