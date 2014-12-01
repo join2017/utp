@@ -40,6 +40,8 @@ type Conn struct {
 	closing   bool
 	closingch chan int
 
+	keepalivech chan time.Duration
+
 	connch chan int
 
 	closech      chan int
@@ -63,8 +65,9 @@ func newConn() *Conn {
 		ackch:   make(chan int),
 		synch:   make(chan int),
 
-		closingch: make(chan int),
-		closech:   make(chan int),
+		closingch:   make(chan int),
+		keepalivech: make(chan time.Duration),
+		closech:     make(chan int),
 	}
 	return c
 }
@@ -184,11 +187,24 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+// SetKeepAlive sets the keepalive interval associated with the connection.
+func (c *Conn) SetKeepAlive(d time.Duration) error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	if !c.isOpen() {
+		return errClosing
+	}
+	c.keepalivech <- d
+	return nil
+}
+
 func (c *Conn) loop() {
 	defer c.conn.Unregister(int32(c.rid))
 
 	var resendSeq uint16
 	var resendCont int
+	var keepalive <-chan time.Time
 
 	for {
 		f := c.sendbuf.front()
@@ -231,6 +247,15 @@ func (c *Conn) loop() {
 			c.state = stateClosed
 			atomic.StoreInt32(&c.closed, 1)
 			return
+		case d := <-c.keepalivech:
+			if d <= 0 {
+				keepalive = nil
+			} else {
+				keepalive = time.Tick(d)
+			}
+		case <-keepalive:
+			ulog.Printf(2, "Conn(%v): Send keepalive", c.LocalAddr())
+			c.sendACK()
 		}
 		if c.closing {
 			if c.state == stateSynSent || (c.recvbuf.empty() && c.sendbuf.empty()) {
