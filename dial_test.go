@@ -1,6 +1,9 @@
 package utp
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestDial(t *testing.T) {
 	addr, err := ResolveAddr("utp", ":0")
@@ -27,4 +30,18 @@ func TestDial(t *testing.T) {
 	defer c.Close()
 
 	<-ch
+}
+
+func TestDialFastTimeout(t *testing.T) {
+	l, err := Listen("utp", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	_, err = (&Dialer{
+		Timeout: time.Nanosecond,
+	}).Dial("utp", l.Addr().String())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
 }
