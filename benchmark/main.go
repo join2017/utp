@@ -185,7 +185,7 @@ func c2s(l int64, stream bool) float64 {
 }
 
 func s2c(l int64, stream bool) float64 {
-	laddr, err := utp.ResolveAddr("utp", ":0")
+	laddr, err := utp.ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		log.Fatal(err)
 	}
