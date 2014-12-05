@@ -1,8 +1,8 @@
 package utp
 
 import (
-	"net"
 	"testing"
+	"time"
 )
 
 func TestDial(t *testing.T) {
@@ -17,29 +17,31 @@ func TestDial(t *testing.T) {
 	}
 	defer l.Close()
 
-	ch := make(chan int)
+	ch := make(chan struct{})
 	go func() {
-		c, err := l.Accept()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer c.Close()
-		ch <- 0
+		l.Accept()
+		close(ch)
 	}()
 
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	raddr, err := ResolveAddr("utp", net.JoinHostPort("::1", port))
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := DialUTP("utp", nil, raddr)
+	c, err := DialUTP("utp", nil, l.Addr().(*Addr))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer c.Close()
 
 	<-ch
+}
+
+func TestDialFastTimeout(t *testing.T) {
+	l, err := Listen("utp", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	_, err = (&Dialer{
+		Timeout: time.Nanosecond,
+	}).Dial("utp", l.Addr().String())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
 }

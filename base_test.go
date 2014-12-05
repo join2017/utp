@@ -95,10 +95,7 @@ func TestSharedConnSendPacket(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = c.Send(p)
-		if err != nil {
-			t.Fatal(err)
-		}
+		c.Send(p)
 
 		var b [256]byte
 		l, err := uc.Read(b[:])

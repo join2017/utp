@@ -278,17 +278,17 @@ func (c *baseConn) isOpen() bool {
 	return atomic.LoadInt32(&c.closed) == 0
 }
 
-func (c *baseConn) Send(p *packet) error {
+func (c *baseConn) Send(p *packet) {
 	b, err := p.MarshalBinary()
 	if err != nil {
-		return err
+		panic(err)
 	}
 	ulog.Printf(3, "baseConn(%v): SEND: %v to %v", c.LocalAddr(), p, p.addr)
 	_, err = c.conn.WriteTo(b, p.addr)
 	if err != nil {
 		ulog.Printf(3, "%v", err)
+		panic(err)
 	}
-	return err
 }
 
 func (c *baseConn) RecvSyn(timeout time.Duration) (*packet, error) {
