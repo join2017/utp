@@ -58,6 +58,8 @@ func newConn() *Conn {
 		recv:   make(chan *packet),
 		connch: make(chan int),
 
+		recvbuf: newPacketBuffer(0, 0),
+
 		readbuf:  newByteRingBuffer(readBufferSize),
 		writebuf: newRateLimitedBuffer(wch, mss),
 
@@ -393,7 +395,6 @@ func (c *Conn) processPacket(p *packet) {
 		c.close()
 
 	default:
-		if c.recvbuf != nil {
 			c.recvbuf.push(p)
 			for _, s := range c.recvbuf.fetchSequence() {
 				c.ack = s.header.seq
@@ -404,7 +405,6 @@ func (c *Conn) processPacket(p *packet) {
 				}
 			}
 			c.sendACK()
-		}
 	}
 }
 
