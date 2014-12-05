@@ -116,15 +116,8 @@ func (c *Conn) Read(b []byte) (int, error) {
 			Err:  errClosing,
 		}
 	}
-	var d time.Duration
-	if !c.rdeadline.IsZero() {
-		d = c.rdeadline.Sub(time.Now())
-		if d < 0 {
-			d = 0
-		}
-	}
 	s := c.readbuf.space()
-	l, err := c.readbuf.ReadTimeout(b, d)
+	l, err := c.readbuf.ReadTimeout(b, timeToDeadline(c.rdeadline))
 	if s < mss && c.readbuf.space() > 0 {
 		select {
 		case c.ackch <- 0:
@@ -132,6 +125,17 @@ func (c *Conn) Read(b []byte) (int, error) {
 		}
 	}
 	return l, err
+}
+
+func timeToDeadline(deadline time.Time) (d time.Duration) {
+	if deadline.IsZero() {
+		return
+	}
+	d = deadline.Sub(time.Now())
+	if d < 0 {
+		d = 0
+	}
+	return
 }
 
 // Write implements the Conn Write method.
@@ -147,14 +151,7 @@ func (c *Conn) Write(b []byte) (int, error) {
 			Err:  errClosing,
 		}
 	}
-	var d time.Duration
-	if !c.rdeadline.IsZero() {
-		d = c.rdeadline.Sub(time.Now())
-		if d < 0 {
-			d = 0
-		}
-	}
-	return c.writebuf.WriteTimeout(b, d)
+	return c.writebuf.WriteTimeout(b, timeToDeadline(c.wdeadline))
 }
 
 // SetDeadline implements the Conn SetDeadline method.
