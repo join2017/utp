@@ -9,7 +9,7 @@ import (
 )
 
 func TestSharedConnRecvPacket(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,11 +20,7 @@ func TestSharedConnRecvPacket(t *testing.T) {
 	}
 	defer c.Close()
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +50,7 @@ func TestSharedConnRecvPacket(t *testing.T) {
 }
 
 func TestSharedConnSendPacket(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +61,7 @@ func TestSharedConnSendPacket(t *testing.T) {
 	}
 	defer c.Close()
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,11 +73,7 @@ func TestSharedConnSendPacket(t *testing.T) {
 	defer uc.Close()
 
 	for i := 0; i < 100; i++ {
-		_, port, err := net.SplitHostPort(uc.LocalAddr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+		addr, err := net.ResolveUDPAddr("udp", uc.LocalAddr().String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +98,7 @@ func TestSharedConnSendPacket(t *testing.T) {
 }
 
 func TestSharedConnRecvSyn(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,11 +109,7 @@ func TestSharedConnRecvSyn(t *testing.T) {
 	}
 	defer c.Close()
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +140,7 @@ func TestSharedConnRecvSyn(t *testing.T) {
 }
 
 func TestSharedConnRecvOutOfBound(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,11 +151,7 @@ func TestSharedConnRecvOutOfBound(t *testing.T) {
 	}
 	defer c.Close()
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +179,7 @@ func TestSharedConnRecvOutOfBound(t *testing.T) {
 }
 
 func TestSharedConnSendOutOfBound(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,11 +190,7 @@ func TestSharedConnSendOutOfBound(t *testing.T) {
 	}
 	defer c.Close()
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,11 +202,7 @@ func TestSharedConnSendOutOfBound(t *testing.T) {
 	defer uc.Close()
 
 	for i := 0; i < 100; i++ {
-		_, port, err := net.SplitHostPort(uc.LocalAddr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+		addr, err := net.ResolveUDPAddr("udp", uc.LocalAddr().String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +225,7 @@ func TestSharedConnSendOutOfBound(t *testing.T) {
 }
 
 func TestSharedConnReferenceCount(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +267,7 @@ func TestSharedConnReferenceCount(t *testing.T) {
 }
 
 func TestSharedConnClose(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,11 +288,7 @@ func TestSharedConnClose(t *testing.T) {
 		t.Fatal("ReadFrom should fail")
 	}
 
-	_, port, err := net.SplitHostPort(c.LocalAddr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", c.LocalAddr().String())
 	if err != nil {
 		t.Fatal(err)
 	}

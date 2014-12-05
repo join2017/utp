@@ -2,12 +2,11 @@ package utp
 
 import (
 	"bytes"
-	"net"
 	"testing"
 )
 
 func TestReadWrite(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,16 +39,7 @@ func TestReadWrite(t *testing.T) {
 		ch <- 0
 	}()
 
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	raddr, err := ResolveAddr("utp", net.JoinHostPort("::1", port))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err := DialUTP("utp", nil, raddr)
+	c, err := DialUTP("utp", nil, l.Addr().(*Addr))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +54,7 @@ func TestReadWrite(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,16 +73,7 @@ func TestClose(t *testing.T) {
 		c.Close()
 	}()
 
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	raddr, err := ResolveAddr("utp", net.JoinHostPort("::1", port))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err := DialUTP("utp", nil, raddr)
+	c, err := DialUTP("utp", nil, l.Addr().(*Addr))
 	if err != nil {
 		t.Fatal(err)
 	}

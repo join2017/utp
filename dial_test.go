@@ -6,7 +6,7 @@ import (
 )
 
 func TestDial(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,12 @@ func TestDial(t *testing.T) {
 }
 
 func TestDialFastTimeout(t *testing.T) {
-	l, err := Listen("utp", nil)
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	l, err := Listen("utp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}

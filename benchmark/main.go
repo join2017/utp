@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"net"
 	"sync"
 	"time"
 
@@ -86,7 +85,7 @@ func main() {
 }
 
 func c2s(l int64, stream bool) float64 {
-	laddr, err := utp.ResolveAddr("utp", ":0")
+	laddr, err := utp.ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -95,18 +94,9 @@ func c2s(l int64, stream bool) float64 {
 		log.Fatal(err)
 	}
 
-	_, port, err := net.SplitHostPort(ln.Addr().String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	raddr, err := utp.ResolveAddr("utp", net.JoinHostPort("::1", port))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	cch := make(chan *utp.Conn)
 	go func() {
-		c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
+		c, err := utp.DialUTPTimeout("utp", nil, ln.Addr().(*utp.Addr), 1000*time.Millisecond)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -204,18 +194,9 @@ func s2c(l int64, stream bool) float64 {
 		log.Fatal(err)
 	}
 
-	_, port, err := net.SplitHostPort(ln.Addr().String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	raddr, err := utp.ResolveAddr("utp", net.JoinHostPort("::1", port))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	cch := make(chan *utp.Conn)
 	go func() {
-		c, err := utp.DialUTPTimeout("utp", nil, raddr, 1000*time.Millisecond)
+		c, err := utp.DialUTPTimeout("utp", nil, ln.Addr().(*utp.Addr), 1000*time.Millisecond)
 		if err != nil {
 			log.Fatal(err)
 		}

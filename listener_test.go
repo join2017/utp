@@ -6,7 +6,7 @@ import (
 )
 
 func TestListenerAccept(t *testing.T) {
-	addr, err := ResolveAddr("utp", ":0")
+	addr, err := ResolveAddr("utp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -17,11 +17,7 @@ func TestListenerAccept(t *testing.T) {
 	}
 	defer l.Close()
 
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	uaddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort("::1", port))
+	uaddr, err := net.ResolveUDPAddr("udp", l.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
