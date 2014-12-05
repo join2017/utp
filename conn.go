@@ -32,8 +32,9 @@ type Conn struct {
 	ackch   chan int
 	synch   chan int
 
-	rdeadline time.Time
-	wdeadline time.Time
+	rdeadline     time.Time
+	wdeadline     time.Time
+	deadlineMutex sync.RWMutex
 
 	recv chan *packet
 
@@ -119,7 +120,10 @@ func (c *Conn) Read(b []byte) (int, error) {
 		}
 	}
 	s := c.readbuf.space()
-	l, err := c.readbuf.ReadTimeout(b, timeToDeadline(c.rdeadline))
+	c.deadlineMutex.RLock()
+	d := timeToDeadline(c.rdeadline)
+	c.deadlineMutex.RUnlock()
+	l, err := c.readbuf.ReadTimeout(b, d)
 	if s < mss && c.readbuf.space() > 0 {
 		select {
 		case c.ackch <- 0:
@@ -153,7 +157,10 @@ func (c *Conn) Write(b []byte) (int, error) {
 			Err:  errClosing,
 		}
 	}
-	return c.writebuf.WriteTimeout(b, timeToDeadline(c.wdeadline))
+	c.deadlineMutex.RLock()
+	d := timeToDeadline(c.wdeadline)
+	c.deadlineMutex.RUnlock()
+	return c.writebuf.WriteTimeout(b, d)
 }
 
 // SetDeadline implements the Conn SetDeadline method.
@@ -173,6 +180,8 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
+	c.deadlineMutex.Lock()
+	defer c.deadlineMutex.Unlock()
 	c.rdeadline = t
 	return nil
 }
@@ -182,6 +191,8 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	if !c.ok() {
 		return syscall.EINVAL
 	}
+	c.deadlineMutex.Lock()
+	defer c.deadlineMutex.Unlock()
 	c.wdeadline = t
 	return nil
 }
@@ -395,16 +406,16 @@ func (c *Conn) processPacket(p *packet) {
 		c.close()
 
 	default:
-			c.recvbuf.push(p)
-			for _, s := range c.recvbuf.fetchSequence() {
-				c.ack = s.header.seq
-				if s.header.typ == stData {
-					c.readbuf.Write(s.payload)
-				} else if s.header.typ == stFin {
-					c.enterClosing()
-				}
+		c.recvbuf.push(p)
+		for _, s := range c.recvbuf.fetchSequence() {
+			c.ack = s.header.seq
+			if s.header.typ == stData {
+				c.readbuf.Write(s.payload)
+			} else if s.header.typ == stFin {
+				c.enterClosing()
 			}
-			c.sendACK()
+		}
+		c.sendACK()
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -16,9 +17,10 @@ type Listener struct {
 	// This allows a single socket to handle multiple protocols.
 	RawConn net.PacketConn
 
-	conn     *baseConn
-	deadline time.Time
-	closed   int32
+	conn          *baseConn
+	deadline      time.Time
+	deadlineMutex sync.RWMutex
+	closed        int32
 }
 
 func (l *Listener) ok() bool { return l != nil && l.conn != nil }
@@ -60,13 +62,9 @@ func (l *Listener) AcceptUTP() (*Conn, error) {
 			Err:  errClosing,
 		}
 	}
-	var d time.Duration
-	if !l.deadline.IsZero() {
-		d = l.deadline.Sub(time.Now())
-		if d < 0 {
-			d = 0
-		}
-	}
+	l.deadlineMutex.RLock()
+	d := timeToDeadline(l.deadline)
+	l.deadlineMutex.RUnlock()
 	p, err := l.conn.RecvSyn(d)
 	if err != nil {
 		return nil, &net.OpError{
@@ -129,6 +127,8 @@ func (l *Listener) SetDeadline(t time.Time) error {
 	if !l.ok() {
 		return syscall.EINVAL
 	}
+	l.deadlineMutex.Lock()
+	defer l.deadlineMutex.Unlock()
 	l.deadline = t
 	return nil
 }
