@@ -118,6 +118,7 @@ func c2s(l int64, stream bool) float64 {
 	defer c.Close()
 
 	rch := make(chan int)
+	wch := make(chan int)
 
 	sendHash := md5.New()
 	readHash := md5.New()
@@ -127,12 +128,13 @@ func c2s(l int64, stream bool) float64 {
 	if stream {
 		go func() {
 			defer c.Close()
+			defer close(wch)
 			io.Copy(io.MultiWriter(c, sendHash, &counter), io.LimitReader(RandReader{}, l))
 		}()
 
 		go func() {
+			defer close(rch)
 			io.Copy(readHash, s)
-			close(rch)
 		}()
 
 		go func() {
@@ -153,6 +155,7 @@ func c2s(l int64, stream bool) float64 {
 
 		start := time.Now()
 		<-rch
+		<-wch
 		bps = float64(l*8) / (float64(time.Now().Sub(start)) / float64(time.Second))
 
 	} else {
@@ -161,16 +164,18 @@ func c2s(l int64, stream bool) float64 {
 
 		go func() {
 			defer c.Close()
+			defer close(wch)
 			io.Copy(c, &sendBuf)
 		}()
 
 		go func() {
+			defer close(rch)
 			io.Copy(&readBuf, s)
-			rch <- 0
 		}()
 
 		start := time.Now()
 		<-rch
+		<-wch
 		bps = float64(l*8) / (float64(time.Now().Sub(start)) / float64(time.Second))
 
 		io.Copy(sendHash, &sendBuf)
@@ -218,6 +223,7 @@ func s2c(l int64, stream bool) float64 {
 	defer c.Close()
 
 	rch := make(chan int)
+	wch := make(chan int)
 
 	sendHash := md5.New()
 	readHash := md5.New()
@@ -228,12 +234,13 @@ func s2c(l int64, stream bool) float64 {
 	if stream {
 		go func() {
 			defer s.Close()
+			defer close(wch)
 			io.Copy(io.MultiWriter(s, sendHash, &counter), io.LimitReader(RandReader{}, l))
 		}()
 
 		go func() {
+			defer close(rch)
 			io.Copy(readHash, c)
-			close(rch)
 		}()
 
 		go func() {
@@ -254,6 +261,7 @@ func s2c(l int64, stream bool) float64 {
 
 		start := time.Now()
 		<-rch
+		<-wch
 		bps = float64(l*8) / (float64(time.Now().Sub(start)) / float64(time.Second))
 
 	} else {
@@ -262,16 +270,18 @@ func s2c(l int64, stream bool) float64 {
 
 		go func() {
 			defer s.Close()
+			defer close(wch)
 			io.Copy(s, &sendBuf)
 		}()
 
 		go func() {
+			defer close(rch)
 			io.Copy(&readBuf, c)
-			rch <- 0
 		}()
 
 		start := time.Now()
 		<-rch
+		<-wch
 		bps = float64(l*8) / (float64(time.Now().Sub(start)) / float64(time.Second))
 
 		io.Copy(sendHash, &sendBuf)
