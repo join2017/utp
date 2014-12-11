@@ -248,6 +248,7 @@ func TestSharedConnReferenceCount(t *testing.T) {
 		}(i)
 	}
 
+	w.Wait()
 	for i := 0; i < 5; i++ {
 		w.Add(1)
 		go func(i int) {
@@ -262,7 +263,7 @@ func TestSharedConnReferenceCount(t *testing.T) {
 
 	c = baseConnMap[addr.String()]
 	if c != nil {
-		t.Errorf("baseConn should be released")
+		t.Errorf("baseConn should be released", c.ref)
 	}
 }
 

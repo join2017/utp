@@ -195,13 +195,13 @@ type packetRingBuffer struct {
 	begin int
 	s     int
 	mutex sync.RWMutex
-	rch   chan *packet
+	rch   chan int
 }
 
 func newPacketRingBuffer(s int) *packetRingBuffer {
 	return &packetRingBuffer{
 		b:   make([]*packet, s),
-		rch: make(chan *packet),
+		rch: make(chan int),
 	}
 }
 
@@ -216,11 +216,6 @@ func (b *packetRingBuffer) empty() bool {
 }
 
 func (b *packetRingBuffer) push(p *packet) {
-	select {
-	case b.rch <- p:
-		return
-	default:
-	}
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	b.b[(b.begin+b.s)%len(b.b)] = p
@@ -228,6 +223,10 @@ func (b *packetRingBuffer) push(p *packet) {
 		b.s++
 	} else {
 		b.begin = (b.begin + 1) % len(b.b)
+	}
+	select {
+	case b.rch <- 0:
+	default:
 	}
 }
 
@@ -250,8 +249,7 @@ func (b *packetRingBuffer) popOne(timeout time.Duration) (*packet, error) {
 	}
 	if b.empty() {
 		select {
-		case p := <-b.rch:
-			return p, nil
+		case <-b.rch:
 		case <-t:
 			return nil, errTimeout
 		}

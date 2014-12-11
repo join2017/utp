@@ -118,15 +118,14 @@ func TestPacketRingBuffer(t *testing.T) {
 		t.Errorf("expected size == 4; got %d", b.size())
 	}
 
-	for b.pop() != nil {
-	}
+	for b.pop() != nil {}
 
 	if !b.empty() {
 		t.Errorf("buffer must be empty")
 	}
 
 	go func() {
-		for i := 0; i < 7; i++ {
+		for i := 0; i < 5; i++ {
 			b.push(&packet{header: header{seq: uint16(i)}})
 		}
 	}()

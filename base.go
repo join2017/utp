@@ -23,6 +23,7 @@ type baseConn struct {
 	handlers     map[uint16]packetHandler
 	handlerMutex sync.RWMutex
 	ref          int32
+	refMutex     sync.RWMutex
 
 	rdeadline time.Time
 	wdeadline time.Time
@@ -232,8 +233,10 @@ func (c *baseConn) processPacket(p *packet) {
 }
 
 func (c *baseConn) Register(id int32, f packetHandler) {
+	c.refMutex.Lock()
+	defer c.refMutex.Unlock()
 	if id < 0 {
-		atomic.AddInt32(&c.ref, 1)
+		c.ref++
 	} else {
 		if f == nil {
 			panic("nil handler not allowed")
@@ -241,7 +244,7 @@ func (c *baseConn) Register(id int32, f packetHandler) {
 		c.handlerMutex.Lock()
 		defer c.handlerMutex.Unlock()
 		if _, ok := c.handlers[uint16(id)]; !ok {
-			atomic.AddInt32(&c.ref, 1)
+			c.ref++
 			c.handlers[uint16(id)] = f
 			ulog.Printf(2, "baseConn(%v): register #%d (ref: %d)", c.LocalAddr(), id, c.ref)
 		}
@@ -249,17 +252,19 @@ func (c *baseConn) Register(id int32, f packetHandler) {
 }
 
 func (c *baseConn) Unregister(id int32) {
+	c.refMutex.Lock()
+	defer c.refMutex.Unlock()
 	if id < 0 {
-		atomic.AddInt32(&c.ref, -1)
+		c.ref--
 	} else {
 		c.handlerMutex.Lock()
 		defer c.handlerMutex.Unlock()
 		if _, ok := c.handlers[uint16(id)]; ok {
 			delete(c.handlers, uint16(id))
-			atomic.AddInt32(&c.ref, -1)
+			c.ref--
 		}
 	}
-	if atomic.LoadInt32(&c.ref) <= 0 {
+	if c.ref <= 0 {
 		baseConnMutex.Lock()
 		defer baseConnMutex.Unlock()
 		c.close()
