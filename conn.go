@@ -28,6 +28,8 @@ type Conn struct {
 	readbuf  *byteRingBuffer
 	writebuf *rateLimitedBuffer
 
+	baseDelay baseDelayBuffer
+
 	writech chan []byte
 	ackch   chan int
 	synch   chan int
@@ -316,6 +318,8 @@ func (c *Conn) processPacket(p *packet) {
 		}
 	}
 
+	c.baseDelay.Push(c.diff)
+
 	switch p.header.typ {
 	case stState:
 		f := c.sendbuf.front()
@@ -351,8 +355,9 @@ func (c *Conn) processPacket(p *packet) {
 					c.rto = 1000
 				}
 			}
-			if c.diff != 0 {
-				ourDelay := float64(c.diff)
+
+			ourDelay := float64(c.diff - c.baseDelay.Min())
+			if ourDelay != 0.0 {
 				offTarget := 100000.0 - ourDelay
 				windowFactor := float64(mtu) / float64(c.maxWindow)
 				delayFactor := offTarget / 100000.0

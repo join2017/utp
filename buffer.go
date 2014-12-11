@@ -439,3 +439,33 @@ func (r *rateLimitedBuffer) Close() error {
 	}
 	return nil
 }
+
+type baseDelayBuffer struct {
+	b    [6]uint32
+	last int
+	min  uint32
+}
+
+func (b *baseDelayBuffer) Push(val uint32) {
+	t := time.Now()
+	i := t.Second()/20 + (t.Minute()%2)*3
+	if b.last == i {
+		if b.b[i] > val {
+			b.b[i] = val
+		}
+	} else {
+		b.b[i] = val
+		b.last = i
+	}
+	min := val
+	for _, v := range b.b {
+		if v > 0 && min > v {
+			min = v
+		}
+	}
+	b.min = min
+}
+
+func (b *baseDelayBuffer) Min() uint32 {
+	return b.min
+}
