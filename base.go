@@ -267,13 +267,18 @@ func (c *baseConn) Unregister(id int32) {
 		_, ok := c.handlers[uint16(id)]
 		c.handlerMutex.Unlock()
 		if ok {
+			c.handlerMutex.Lock()
 			delete(c.handlers, uint16(id))
+			c.handlerMutex.Unlock()
 			c.refMutex.Lock()
 			c.ref--
 			c.refMutex.Unlock()
 		}
 	}
-	if c.ref <= 0 {
+	c.refMutex.Lock()
+	r := c.ref
+	c.refMutex.Unlock()
+	if r <= 0 {
 		baseConnMutex.Lock()
 		defer baseConnMutex.Unlock()
 		c.close()
