@@ -106,6 +106,11 @@ func (c *Conn) Close() error {
 	default:
 		close(c.closingch)
 	}
+	select {
+	case <-c.connch:
+	default:
+		return nil
+	}
 	<-c.closech
 	return nil
 }
