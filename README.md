@@ -14,3 +14,15 @@ http://www.bittorrent.org/beps/bep_0029.html
 ```
 go get github.com/h2so5/utp
 ```
+
+## Debug Log
+
+Use GO_UTP_LOGGING to show debug logs.
+
+```
+GO_UTP_LOGGING=0 go test  <- default, no logging
+GO_UTP_LOGGING=1 go test
+GO_UTP_LOGGING=2 go test
+GO_UTP_LOGGING=3 go test
+GO_UTP_LOGGING=4 go test  <- most verbose
+```
