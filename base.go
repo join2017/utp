@@ -306,7 +306,3 @@ func (c *baseConn) Send(p *packet) {
 func (c *baseConn) RecvSyn(timeout time.Duration) (*packet, error) {
 	return c.synPackets.popOne(timeout)
 }
-
-func (c *baseConn) ResetSyn() {
-	c.synPackets.reset()
-}
