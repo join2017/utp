@@ -101,7 +101,11 @@ func (c *Conn) Close() error {
 	if !c.isOpen() {
 		return nil
 	}
-	c.closingch <- 0
+	select {
+	case <-c.closingch:
+	default:
+		close(c.closingch)
+	}
 	<-c.closech
 	return nil
 }
