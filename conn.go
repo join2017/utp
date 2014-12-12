@@ -49,6 +49,20 @@ type Conn struct {
 
 	closech      chan int
 	closechMutex sync.Mutex
+
+	stat statistics
+}
+
+type statistics struct {
+	sentPackets            int
+	resentPackets          int
+	receivedPackets        int
+	receivedDuplicatedACKs int
+	packetTimedOuts        int
+	sentSelectiveACKs      int
+	receivedSelectiveACKs  int
+	rtoSum                 int64
+	rtoCount               int
 }
 
 func newConn() *Conn {
@@ -230,6 +244,7 @@ func (c *Conn) loop() {
 		case <-c.synch:
 			c.sendSYN()
 		case p := <-c.recv:
+			c.stat.receivedPackets++
 			c.processPacket(p)
 		case b := <-c.writech:
 			c.sendDATA(b)
@@ -242,6 +257,7 @@ func (c *Conn) loop() {
 				resendCont = 0
 				resendSeq = f.header.seq
 			}
+			c.stat.packetTimedOuts++
 			if resendCont > maxRetry {
 				c.sendRST()
 				c.close()
@@ -294,7 +310,17 @@ func (c *Conn) close() {
 	default:
 		close(c.closech)
 	}
-	ulog.Printf(3, "Conn(%v): closed", c.LocalAddr())
+	ulog.Printf(1, "Conn(%v): closed", c.LocalAddr())
+	ulog.Printf(1, "Conn(%v): * SentPackets: %d", c.LocalAddr(), c.stat.sentPackets)
+	ulog.Printf(1, "Conn(%v): * ResentPackets: %d", c.LocalAddr(), c.stat.resentPackets)
+	ulog.Printf(1, "Conn(%v): * ReceivedPackets: %d", c.LocalAddr(), c.stat.receivedPackets)
+	ulog.Printf(1, "Conn(%v): * ReceivedDuplicatedACKs: %d", c.LocalAddr(), c.stat.receivedDuplicatedACKs)
+	ulog.Printf(1, "Conn(%v): * PacketTimedOuts: %d", c.LocalAddr(), c.stat.packetTimedOuts)
+	ulog.Printf(1, "Conn(%v): * SentSelectiveACKs: %d", c.LocalAddr(), c.stat.sentSelectiveACKs)
+	ulog.Printf(1, "Conn(%v): * ReceivedSelectiveACKs: %d", c.LocalAddr(), c.stat.receivedSelectiveACKs)
+	if c.stat.rtoCount > 0 {
+		ulog.Printf(1, "Conn(%v): * AverageRTO: %d", c.LocalAddr(), c.stat.rtoSum/int64(c.stat.rtoCount))
+	}
 }
 
 func (c *Conn) isOpen() bool {
@@ -327,6 +353,7 @@ func (c *Conn) processPacket(p *packet) {
 			for _, e := range p.ext {
 				if e.typ == extSelectiveAck {
 					ulog.Printf(3, "Conn(%v): Receive Selective ACK", c.LocalAddr())
+					c.stat.receivedSelectiveACKs++
 					c.sendbuf.processSelectiveACK(e.payload)
 				}
 			}
@@ -354,6 +381,8 @@ func (c *Conn) processPacket(p *packet) {
 				} else if c.rto > 1000 {
 					c.rto = 1000
 				}
+				c.stat.rtoSum += c.rto
+				c.stat.rtoCount++
 			}
 
 			ourDelay := float64(c.diff - c.baseDelay.Min())
@@ -375,6 +404,7 @@ func (c *Conn) processPacket(p *packet) {
 		if c.lastAck == p.header.ack {
 			c.dupAck++
 			if c.dupAck >= 2 {
+				c.stat.receivedDuplicatedACKs++
 				ulog.Printf(3, "Conn(%v): Receive 3 duplicated acks: %d", c.LocalAddr(), p.header.ack)
 				p := c.sendbuf.front()
 				if p != nil {
@@ -428,6 +458,7 @@ func (c *Conn) sendACK() {
 	ack := c.makePacket(stState, nil, c.raddr)
 	selack := c.sendbuf.generateSelectiveACK()
 	if selack != nil {
+		c.stat.sentSelectiveACKs++
 		ack.ext = []extension{
 			extension{
 				typ:     extSelectiveAck,
@@ -435,6 +466,7 @@ func (c *Conn) sendACK() {
 			},
 		}
 	}
+	c.stat.sentPackets++
 	c.conn.Send(ack)
 }
 
@@ -444,6 +476,7 @@ func (c *Conn) sendSYN() {
 	if err != nil {
 		panic(err)
 	}
+	c.stat.sentPackets++
 	c.conn.Send(syn)
 }
 
@@ -453,11 +486,13 @@ func (c *Conn) sendFIN() {
 	if err != nil {
 		panic(err)
 	}
+	c.stat.sentPackets++
 	c.conn.Send(fin)
 }
 
 func (c *Conn) sendRST() {
 	rst := c.makePacket(stReset, nil, c.raddr)
+	c.stat.sentPackets++
 	c.conn.Send(rst)
 }
 
@@ -469,11 +504,13 @@ func (c *Conn) sendDATA(b []byte) {
 		}
 		data := c.makePacket(stData, b[i*mss:i*mss+l], c.raddr)
 		c.sendbuf.push(data)
+		c.stat.sentPackets++
 		c.conn.Send(data)
 	}
 }
 
 func (c *Conn) resend(p *packet) {
+	c.stat.resentPackets++
 	c.conn.Send(p)
 	ulog.Printf(3, "Conn(%v): RESEND: %s", c.LocalAddr(), p.String())
 }
