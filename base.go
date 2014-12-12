@@ -249,7 +249,9 @@ func (c *baseConn) Register(id int32, f packetHandler) {
 			c.refMutex.Lock()
 			c.ref++
 			c.refMutex.Unlock()
+			c.handlerMutex.Lock()
 			c.handlers[uint16(id)] = f
+			c.handlerMutex.Unlock()
 			ulog.Printf(2, "baseConn(%v): register #%d (ref: %d)", c.LocalAddr(), id, c.ref)
 		}
 	}
