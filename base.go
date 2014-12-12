@@ -226,25 +226,29 @@ func (c *baseConn) exists(id uint16) bool {
 
 func (c *baseConn) processPacket(p *packet) {
 	c.handlerMutex.RLock()
-	defer c.handlerMutex.RUnlock()
-	if h, ok := c.handlers[p.header.id]; ok {
+	h, ok := c.handlers[p.header.id]
+	c.handlerMutex.RUnlock()
+	if ok {
 		h <- p
 	}
 }
 
 func (c *baseConn) Register(id int32, f packetHandler) {
-	c.refMutex.Lock()
-	defer c.refMutex.Unlock()
 	if id < 0 {
+		c.refMutex.Lock()
 		c.ref++
+		c.refMutex.Unlock()
 	} else {
 		if f == nil {
 			panic("nil handler not allowed")
 		}
 		c.handlerMutex.Lock()
-		defer c.handlerMutex.Unlock()
-		if _, ok := c.handlers[uint16(id)]; !ok {
+		_, ok := c.handlers[uint16(id)]
+		c.handlerMutex.Unlock()
+		if !ok {
+			c.refMutex.Lock()
 			c.ref++
+			c.refMutex.Unlock()
 			c.handlers[uint16(id)] = f
 			ulog.Printf(2, "baseConn(%v): register #%d (ref: %d)", c.LocalAddr(), id, c.ref)
 		}
@@ -252,16 +256,19 @@ func (c *baseConn) Register(id int32, f packetHandler) {
 }
 
 func (c *baseConn) Unregister(id int32) {
-	c.refMutex.Lock()
-	defer c.refMutex.Unlock()
 	if id < 0 {
+		c.refMutex.Lock()
 		c.ref--
+		c.refMutex.Unlock()
 	} else {
 		c.handlerMutex.Lock()
-		defer c.handlerMutex.Unlock()
-		if _, ok := c.handlers[uint16(id)]; ok {
+		_, ok := c.handlers[uint16(id)]
+		c.handlerMutex.Unlock()
+		if ok {
 			delete(c.handlers, uint16(id))
+			c.refMutex.Lock()
 			c.ref--
+			c.refMutex.Unlock()
 		}
 	}
 	if c.ref <= 0 {
@@ -298,4 +305,8 @@ func (c *baseConn) Send(p *packet) {
 
 func (c *baseConn) RecvSyn(timeout time.Duration) (*packet, error) {
 	return c.synPackets.popOne(timeout)
+}
+
+func (c *baseConn) ResetSyn() {
+	c.synPackets.reset()
 }
