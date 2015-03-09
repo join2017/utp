@@ -240,7 +240,7 @@ func (c *Conn) loop() {
 	var resendSeq uint16
 	var resendCont int
 	var keepalive <-chan time.Time
-	
+
 	resend := time.NewTimer(0)
 	resend.Stop()
 	defer resend.Stop()
@@ -299,7 +299,7 @@ func (c *Conn) loop() {
 			c.sendACK()
 		}
 		if c.closing {
-			if c.state == stateSynSent || (c.recvbuf.empty() && c.sendbuf.empty()) {
+			if c.state == stateSynSent || c.state == stateFinSent || (c.recvbuf.empty() && c.sendbuf.empty()) {
 				c.close()
 			}
 		}
