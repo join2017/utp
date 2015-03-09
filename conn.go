@@ -241,12 +241,11 @@ func (c *Conn) loop() {
 	var resendCont int
 	var keepalive <-chan time.Time
 
-	resend := time.NewTimer(time.Millisecond)
-	<-resend.C
 	for {
 		f := c.sendbuf.front()
+		var resend <-chan time.Time
 		if f != nil {
-			resend.Reset(time.Duration(c.rto) * time.Millisecond)
+			resend = time.After(time.Duration(c.rto) * time.Millisecond)
 		}
 		select {
 		case <-c.ackch:
@@ -260,7 +259,7 @@ func (c *Conn) loop() {
 			c.sendDATA(b)
 		case <-c.closingch:
 			c.enterClosing()
-		case <-resend.C:
+		case <-resend:
 			if resendSeq == f.header.seq {
 				resendCont++
 			} else {
