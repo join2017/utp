@@ -36,14 +36,15 @@ func DialUTPTimeout(n string, laddr, raddr *Addr, timeout time.Duration) (*Conn,
 	go c.loop()
 	c.synch <- 0
 
-	var t <-chan time.Time
-	if timeout != 0 {
-		t = time.After(timeout)
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	if timeout == 0 {
+		t.Stop()
 	}
 
 	select {
 	case <-c.connch:
-	case <-t:
+	case <-t.C:
 		c.Close()
 		return nil, &net.OpError{
 			Op:   "dial",

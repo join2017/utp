@@ -243,14 +243,15 @@ func (b *packetRingBuffer) pop() *packet {
 }
 
 func (b *packetRingBuffer) popOne(timeout time.Duration) (*packet, error) {
-	var t <-chan time.Time
-	if timeout != 0 {
-		t = time.After(timeout)
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	if timeout == 0 {
+		t.Stop()
 	}
 	if b.empty() {
 		select {
 		case <-b.rch:
-		case <-t:
+		case <-t.C:
 			return nil, errTimeout
 		}
 	}
@@ -318,14 +319,15 @@ func (r *byteRingBuffer) Write(b []byte) (int, error) {
 }
 
 func (r *byteRingBuffer) ReadTimeout(b []byte, timeout time.Duration) (int, error) {
-	var t <-chan time.Time
-	if timeout != 0 {
-		t = time.After(timeout)
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	if timeout == 0 {
+		t.Stop()
 	}
 	if r.empty() {
 		select {
 		case <-r.rch:
-		case <-t:
+		case <-t.C:
 			return 0, errTimeout
 		case <-r.closech:
 			return 0, io.EOF
@@ -380,9 +382,10 @@ func newRateLimitedBuffer(ch chan<- []byte, size uint32) *rateLimitedBuffer {
 }
 
 func (r *rateLimitedBuffer) WriteTimeout(b []byte, timeout time.Duration) (int, error) {
-	var t <-chan time.Time
-	if timeout != 0 {
-		t = time.After(timeout)
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	if timeout == 0 {
+		t.Stop()
 	}
 
 	for wrote := uint32(0); wrote < uint32(len(b)); {
@@ -408,7 +411,7 @@ func (r *rateLimitedBuffer) WriteTimeout(b []byte, timeout time.Duration) (int, 
 			r.sizeMutex.Unlock()
 		case <-r.closech:
 			return 0, errClosing
-		case <-t:
+		case <-t.C:
 			return 0, errTimeout
 		}
 	}
