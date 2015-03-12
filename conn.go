@@ -264,23 +264,25 @@ func (c *Conn) loop() {
 		case <-c.closingch:
 			c.enterClosing()
 		case <-resend.C:
-			if resendSeq == f.header.seq {
-				resendCont++
-			} else {
-				resendCont = 0
-				resendSeq = f.header.seq
-			}
-			c.stat.packetTimedOuts++
-			if resendCont > maxRetry {
-				c.sendRST()
-				c.close()
-			} else {
-				c.maxWindow /= 2
-				if c.maxWindow < mtu {
-					c.maxWindow = mtu
+			if f != nil {
+				if resendSeq == f.header.seq {
+					resendCont++
+				} else {
+					resendCont = 0
+					resendSeq = f.header.seq
 				}
-				for _, p := range c.sendbuf.sequence() {
-					c.resend(p)
+				c.stat.packetTimedOuts++
+				if resendCont > maxRetry {
+					c.sendRST()
+					c.close()
+				} else {
+					c.maxWindow /= 2
+					if c.maxWindow < mtu {
+						c.maxWindow = mtu
+					}
+					for _, p := range c.sendbuf.sequence() {
+						c.resend(p)
+					}
 				}
 			}
 		case <-c.closech:
@@ -487,7 +489,8 @@ func (c *Conn) sendSYN() {
 	syn := c.makePacket(stSyn, nil, c.raddr)
 	err := c.sendbuf.push(syn)
 	if err != nil {
-		panic(err)
+		ulog.Printf(2, "Conn(%v): buffer error: %v", c.LocalAddr(), err)
+		return
 	}
 	c.stat.sentPackets++
 	c.conn.Send(syn)
@@ -497,7 +500,8 @@ func (c *Conn) sendFIN() {
 	fin := c.makePacket(stFin, nil, c.raddr)
 	err := c.sendbuf.push(fin)
 	if err != nil {
-		panic(err)
+		ulog.Printf(2, "Conn(%v): buffer error: %v", c.LocalAddr(), err)
+		return
 	}
 	c.stat.sentPackets++
 	c.conn.Send(fin)
