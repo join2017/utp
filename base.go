@@ -12,7 +12,10 @@ import (
 var baseConnMap = make(map[string]*baseConn)
 var baseConnMutex sync.Mutex
 
-type packetHandler chan<- *packet
+type packetHandler struct {
+	send   chan<- *packet
+	closed chan int
+}
 
 type baseConn struct {
 	addr             string
@@ -20,7 +23,7 @@ type baseConn struct {
 	synPackets       *packetRingBuffer
 	outOfBandPackets *packetRingBuffer
 
-	handlers     map[uint16]packetHandler
+	handlers     map[uint16]*packetHandler
 	handlerMutex sync.RWMutex
 	ref          int32
 	refMutex     sync.RWMutex
@@ -51,7 +54,7 @@ func newBaseConn(n string, addr *Addr) (*baseConn, error) {
 		conn:             conn,
 		synPackets:       newPacketRingBuffer(packetBufferSize),
 		outOfBandPackets: newPacketRingBuffer(packetBufferSize),
-		handlers:         make(map[uint16]packetHandler),
+		handlers:         make(map[uint16]*packetHandler),
 	}
 	c.Register(-1, nil)
 	go c.recvLoop()
@@ -229,11 +232,14 @@ func (c *baseConn) processPacket(p *packet) {
 	h, ok := c.handlers[p.header.id]
 	c.handlerMutex.RUnlock()
 	if ok {
-		h <- p
+		select {
+		case <-h.closed:
+		case h.send <- p:
+		}
 	}
 }
 
-func (c *baseConn) Register(id int32, f packetHandler) {
+func (c *baseConn) Register(id int32, f chan<- *packet) {
 	if id < 0 {
 		c.refMutex.Lock()
 		c.ref++
@@ -250,7 +256,10 @@ func (c *baseConn) Register(id int32, f packetHandler) {
 			c.ref++
 			c.refMutex.Unlock()
 			c.handlerMutex.Lock()
-			c.handlers[uint16(id)] = f
+			c.handlers[uint16(id)] = &packetHandler{
+				send:   f,
+				closed: make(chan int),
+			}
 			c.handlerMutex.Unlock()
 			ulog.Printf(2, "baseConn(%v): register #%d (ref: %d)", c.LocalAddr(), id, c.ref)
 		}
@@ -264,10 +273,11 @@ func (c *baseConn) Unregister(id int32) {
 		c.refMutex.Unlock()
 	} else {
 		c.handlerMutex.Lock()
-		_, ok := c.handlers[uint16(id)]
+		f, ok := c.handlers[uint16(id)]
 		c.handlerMutex.Unlock()
 		if ok {
 			c.handlerMutex.Lock()
+			close(f.closed)
 			delete(c.handlers, uint16(id))
 			c.handlerMutex.Unlock()
 			c.refMutex.Lock()
