@@ -301,6 +301,7 @@ func (c *Conn) loop() {
 			c.sendACK()
 		}
 		if c.closing {
+			c.tryFIN()
 			if c.state == stateSynSent || c.state == stateFinSent || (c.recvbuf.empty() && c.sendbuf.empty()) {
 				c.close()
 			}
@@ -308,11 +309,17 @@ func (c *Conn) loop() {
 	}
 }
 
+func (c *Conn) tryFIN() {
+	if c.state != stateFinSent {
+		if c.sendFIN() == nil {
+			c.writebuf.Close()
+			c.state = stateFinSent
+		}
+	}
+}
+
 func (c *Conn) enterClosing() {
 	if !c.closing {
-		c.sendFIN()
-		c.writebuf.Close()
-		c.state = stateFinSent
 		c.closing = true
 	}
 }
@@ -496,15 +503,16 @@ func (c *Conn) sendSYN() {
 	c.conn.Send(syn)
 }
 
-func (c *Conn) sendFIN() {
+func (c *Conn) sendFIN() error {
 	fin := c.makePacket(stFin, nil, c.raddr)
 	err := c.sendbuf.push(fin)
 	if err != nil {
 		ulog.Printf(2, "Conn(%v): buffer error: %v", c.LocalAddr(), err)
-		return
+		return err
 	}
 	c.stat.sentPackets++
 	c.conn.Send(fin)
+	return nil
 }
 
 func (c *Conn) sendRST() {
@@ -555,7 +563,7 @@ func (c *Conn) makePacket(typ int, payload []byte, dst net.Addr) *packet {
 	p.header.seq = c.seq
 	p.header.ack = c.ack
 	p.addr = dst
-	if typ != stState {
+	if typ != stState && typ != stFin {
 		c.seq++
 	}
 	p.payload = payload
